@@ -2,7 +2,9 @@ from lib.client import Client
 from lib.server import Server
 
 
-class uTorrent:
+class uTorrent(object):
+
+    BUILD = 27220
 
     class BOOLEAN:
         DISABLED = -1
@@ -40,20 +42,33 @@ class Client(Client):
 class Server(Server):
 
     _token_cache = []
+    _response = {'build': uTorrent.BUILD}
 
     def __init__(self, *args, **kwargs):
         super(Server, self).__init__(*args, **kwargs)
 
-        self.routes['/token.html'] = self.route_token_html
+        self.add_route('/gui/', self.response_gui, True)
+        self.add_route('/gui/token.html', self.response_token_html)
 
     @property
     def token(self):
         from uuid import uuid4 as generate_token
 
-        token = generate_token()
+        token = str(generate_token())
         self._token_cache.append(token)
 
         return token
 
-    def route_token_html(self):
+    def response_default(self, *args, **kwargs):
+        return "\ninvalid request"
+
+    def response_token_html(self, *args, **kwargs):
         return "<html><div id='token' style='display:none;'>%s</div></html>" % self.token
+
+    def response_gui(self, *args, **kwargs):
+        if not kwargs.get('token') or kwargs['token'] not in self._token_cache:
+            return self.response_default()
+
+        from json import dumps
+
+        return dumps(self._response)
