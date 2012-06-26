@@ -44,6 +44,8 @@ class Server(Server):
     def __init__(self, *args, **kwargs):
         super(Server, self).__init__(*args, **kwargs)
 
+        self.routes['/token.html'] = self.route_token_html
+
     @property
     def token(self):
         from uuid import uuid4 as generate_token
@@ -53,6 +55,5 @@ class Server(Server):
 
         return token
 
-    @property
-    def token_html(self):
+    def route_token_html(self):
         return "<html><div id='token' style='display:none;'>%s</div></html>" % self.token
