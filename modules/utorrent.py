@@ -85,6 +85,28 @@ class Client(Client):
 class Server(Server):
 
     class Transfer:
+        _fields = [
+            'hash',
+            'status',
+            'name',
+            'size',
+            'percent_progress',
+            'downloaded',
+            'uploaded',
+            'ratio',
+            'upload_speed',
+            'download_speed',
+            'eta',
+            'label',
+            'peers_connected',
+            'peers_in_swarm',
+            'seeds_connected',
+            'seeds_in_swarm',
+            'availability',
+            'torrent_queue_order',
+            'remaining'
+        ]
+
         hash = ''
         status = 0
         name = ''
@@ -117,11 +139,37 @@ class Server(Server):
         self._add_route('/gui/', self.route_gui, True)
         self._add_route('/gui/token.html', self.route_token_html, True)
 
-    def _write_cache(self):
-        pass
+    def _write_cache(self, data):
+        import os
+        import pickle
+        from datetime import datetime
+        from tempfile import gettempdir
+
+        cache_id = datetime.today().strftime('%Y%m%d%H%M%s')
+        filename = "%s%sutorrent-bridge_%s" % (gettempdir(), os.sep, cache_id)
+
+        file = open(filename, 'wb')
+        pickle.dump(data, file)
+        file.close()
+
+        return cache_id
 
     def _read_cache(self, cache_id):
-        pass
+        import os
+        from tempfile import gettempdir
+
+        filename = "%s%sutorrent-bridge_%s" % (gettempdir(), os.sep, cache_id)
+        if not os.path.exists(filename):
+            return False
+
+        #import pickle
+        file = open(filename, 'rb')
+        # data = pickle.load(file)
+        file.close()
+
+        os.remove(filename)
+
+        return
 
     def route_default(self, *args, **kwargs):
         return "\ninvalid request"
@@ -143,8 +191,8 @@ class Server(Server):
                 action = getattr(self, method)
                 action(**kwargs)
 
-        from json import dumps
-        return dumps(self._response)
+        import json
+        return json.dumps(self._response)
 
     def get_token(self):
         from uuid import uuid4 as generate_token
@@ -155,37 +203,20 @@ class Server(Server):
         return token
 
     def get_transfers(self, cache_id=None):
-        self._response.update({
-            'torrents': [],
-            'torrentc': '12345678',
-        })
+        if cache_id:
+            cache = self._read_cache(cache_id)
+            if cache:
+                pass
 
         transfers = self.client.get_transfers()
-        for transfer in transfers:
-            torrent = []
-            for detail in [
-                'hash',
-                'status',
-                'name',
-                'size',
-                'percent_progress',
-                'downloaded',
-                'uploaded',
-                'ratio',
-                'upload_speed',
-                'download_speed',
-                'eta',
-                'label',
-                'peers_connected',
-                'peers_in_swarm',
-                'seeds_connected',
-                'seeds_in_swarm',
-                'availability',
-                'torrent_queue_order',
-                'remaining'
-                ]:
-                torrent.append(getattr(transfer, detail))
-            self._response['torrents'].append(torrent)
+        if transfers:
+            self._response.update({
+                'torrents': [],
+                'torrentc': self._write_cache(transfers),
+            })
+
+            for transfer in transfers:
+                self._response['torrents'].append([getattr(transfer, field) for field in self.Transfer._fields])
 
     def action_start(self, *args, **kwargs):
         self.client.action_start(kwargs.get('hash'))
