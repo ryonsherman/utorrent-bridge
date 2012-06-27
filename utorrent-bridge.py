@@ -16,10 +16,10 @@ class uTorrentBridge:
         self.server.client = self.client
 
     def start(self):
-        self.server.start()
+        self.server._start()
 
     def stop(self):
-        self.server.stop()
+        self.server._stop()
 
 if __name__ == '__main__':
     from ConfigParser import SafeConfigParser
