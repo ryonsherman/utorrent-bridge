@@ -25,7 +25,6 @@ class Server(object):
                 from base64 import b64decode
 
                 username, password = b64decode(header.split(' ')[-1]).split(':')
-
                 if username == self.username and password == self.password:
                     return True
 
@@ -35,13 +34,20 @@ class Server(object):
             path = self.path.split('?')
             route = self._routes.get(path[0], self._routes['/'])
 
-            args = dict([arg.split('=') for arg in path[1].split('&')]) if len(path) > 1 else {}
+            args = {}
+            for field, value in [arg.split('=') for arg in path[1].split('&')]:
+                if args.get(field):
+                    if type(args[field]) != list:
+                        args[field] = [args[field]]
+                    args[field].append(value)
+                else:
+                    args[field] = value
 
             if route['auth']:
                 method = '_auth_%s' % self.auth
                 if hasattr(self, method):
                     auth = getattr(self, method)
-                    if not auth():
+                    if auth and not auth():
                         return self._response_auth()
 
             self._response_default(route['callback'](**args))
@@ -50,28 +56,27 @@ class Server(object):
         self.address = kwargs['address']
         self.port = int(kwargs['port'])
 
-        self.handler = self.Handler
-        self.handler.realm = kwargs.get('realm', 'uTorrent Bridge')
-        self.handler.auth = kwargs.get('auth')
-        self.handler.username = kwargs.get('username')
-        self.handler.password = kwargs.get('password')
+        handler = self.Handler
+        handler.realm = kwargs.get('realm', "uTorrent Bridge")
+        handler.auth = kwargs.get('auth')
+        handler.username = kwargs.get('username')
+        handler.password = kwargs.get('password')
 
-        self.server = HTTPServer((self.address, self.port), self.handler)
-
-        self.add_route('/', self.response_default)
+        self._server = HTTPServer((self.address, self.port), handler)
+        self._add_route('/', self.route_default)
 
     @property
-    def routes(self):
-        return self.server.RequestHandlerClass._routes
+    def _routes(self):
+        return self._server.RequestHandlerClass._routes
 
-    def start(self):
-        self.server.serve_forever()
+    def _start(self):
+        self._server.serve_forever()
 
-    def stop(self):
-        self.server.server_close()
+    def _stop(self):
+        self._server.server_close()
 
-    def add_route(self, path, callback, auth=False):
-        self.routes[path] = {'callback': callback, 'auth': auth}
+    def _add_route(self, path, callback, auth=False):
+        self._routes[path] = {'callback': callback, 'auth': auth}
 
-    def response_default(self, *args, **kwargs):
+    def route_default(self, *args, **kwargs):
         return "<html></html>"
