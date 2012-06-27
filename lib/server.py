@@ -9,7 +9,7 @@ class Server(object):
 
         def _response_auth(self):
             self.send_response(401)
-            self.send_header("WWW-Authenticate", "Basic realm=\"uTorrent Bridge\"")
+            self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % self.realm)
             self.send_header("Content-type", "text/html")
             self.end_headers()
 
@@ -38,9 +38,11 @@ class Server(object):
             args = dict([arg.split('=') for arg in path[1].split('&')]) if len(path) > 1 else {}
 
             if route['auth']:
-                auth = getattr(self, "_auth_%s" % self.auth)
-                if not auth():
-                    return self._response_auth()
+                method = '_auth_%s' % self.auth
+                if hasattr(self, method):
+                    auth = getattr(self, method)
+                    if not auth():
+                        return self._response_auth()
 
             self._response_default(route['callback'](**args))
 
@@ -49,7 +51,8 @@ class Server(object):
         self.port = int(kwargs['port'])
 
         self.handler = self.Handler
-        self.handler.auth = kwargs['auth']
+        self.handler.realm = kwargs.get('realm', 'uTorrent Bridge')
+        self.handler.auth = kwargs.get('auth')
         self.handler.username = kwargs.get('username')
         self.handler.password = kwargs.get('password')
 
