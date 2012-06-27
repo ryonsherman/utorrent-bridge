@@ -12,6 +12,9 @@ class uTorrentBridge:
         server = getattr(module, 'Server')
         self.server = server(**kwargs['server'])
 
+        self.client.server = self.server
+        self.server.client = self.client
+
     def start(self):
         self.server.start()
 
