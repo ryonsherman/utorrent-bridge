@@ -4,6 +4,53 @@ from lib.client import Client
 from lib.server import Server
 
 
+class Transfer:
+    _fields = [
+        'hash',
+        'status',
+        'name',
+        'size',
+        'percent_progress',
+        'downloaded',
+        'uploaded',
+        'ratio',
+        'upload_speed',
+        'download_speed',
+        'eta',
+        'label',
+        'peers_connected',
+        'peers_in_swarm',
+        'seeds_connected',
+        'seeds_in_swarm',
+        'availability',
+        'torrent_queue_order',
+        'remaining'
+    ]
+
+    hash = ''
+    status = 0
+    name = ''
+    size = 0
+    downloaded = 0
+    uploaded = 0
+    ratio = 0
+    upload_speed = 0
+    download_speed = 0
+    eta = 0
+    label = ''
+    peers_connected = 0
+    peers_in_swarm = 0
+    seeds_connected = 0
+    seeds_in_swarm = 0
+    availability = 0
+    torrent_queue_order = 0
+    remaining = 0
+
+    @property
+    def percent_progress(self):
+        return int(self.downloaded / self.size * 1000) if self.size else 0
+
+
 class uTorrent:
 
     BUILD = 27220
@@ -55,7 +102,7 @@ class uTorrent:
     # def action_setprops()
 
 
-class Client(Client):
+class Client(uTorrent, Client):
 
     _token = None
 
@@ -82,54 +129,9 @@ class Client(Client):
             return token
 
 
-class Server(Server):
+class Server(uTorrent, Server):
 
-    class Transfer:
-        _fields = [
-            'hash',
-            'status',
-            'name',
-            'size',
-            'percent_progress',
-            'downloaded',
-            'uploaded',
-            'ratio',
-            'upload_speed',
-            'download_speed',
-            'eta',
-            'label',
-            'peers_connected',
-            'peers_in_swarm',
-            'seeds_connected',
-            'seeds_in_swarm',
-            'availability',
-            'torrent_queue_order',
-            'remaining'
-        ]
-
-        hash = ''
-        status = 0
-        name = ''
-        size = 0
-        downloaded = 0
-        uploaded = 0
-        ratio = 0
-        upload_speed = 0
-        download_speed = 0
-        eta = 0
-        label = ''
-        peers_connected = 0
-        peers_in_swarm = 0
-        seeds_connected = 0
-        seeds_in_swarm = 0
-        availability = 0
-        torrent_queue_order = 0
-        remaining = 0
-
-        @property
-        def percent_progress(self):
-            return int(self.downloaded / self.size * 1000)
-
+    Transfer = Transfer
     _token_cache = []
     _response = {'build': uTorrent.BUILD}
 
@@ -145,8 +147,12 @@ class Server(Server):
         from datetime import datetime
         from tempfile import gettempdir
 
+        path = "%s%sutorrent-bridge" % (gettempdir(), os.sep)
+        if not os.path.exists(path):
+            os.mkdir(path)
+
         cache_id = datetime.today().strftime('%Y%m%d%H%M%s')
-        filename = "%s%sutorrent-bridge_%s" % (gettempdir(), os.sep, cache_id)
+        filename = "%s%s%s" % (path, os.sep, cache_id)
 
         file = open(filename, 'wb')
         pickle.dump(data, file)
@@ -158,18 +164,19 @@ class Server(Server):
         import os
         from tempfile import gettempdir
 
-        filename = "%s%sutorrent-bridge_%s" % (gettempdir(), os.sep, cache_id)
+        filename = "%s%sutorrent-bridge%s%s" % (gettempdir(), os.sep, os.sep, cache_id)
         if not os.path.exists(filename):
             return False
 
-        #import pickle
+        import pickle
         file = open(filename, 'rb')
-        # data = pickle.load(file)
+        data = pickle.load(file)
         file.close()
 
-        os.remove(filename)
+        # TODO: Should cache be removed after use?
+        #os.remove(filename)
 
-        return
+        return data
 
     def route_default(self, *args, **kwargs):
         return "\ninvalid request"
@@ -203,20 +210,31 @@ class Server(Server):
         return token
 
     def get_transfers(self, cache_id=None):
-        if cache_id:
-            cache = self._read_cache(cache_id)
-            if cache:
-                pass
-
         transfers = self.client.get_transfers()
-        if transfers:
-            self._response.update({
-                'torrents': [],
-                'torrentc': self._write_cache(transfers),
-            })
 
+        # TODO: Implement transfer labels
+        self._response['label'] = []
+
+        if cache_id:
+            cache = self._read_cache(cache_id) or []
+
+            self._response['torrentp'] = []
+            for transfer in transfers:
+                cached_transfer = filter(lambda cached_transfer: transfer.hash == cached_transfer.hash, cache)
+                modified = filter(lambda field: getattr(transfer, field) != getattr(cached_transfer[0], field), self.Transfer._fields) if cached_transfer else False
+                if not cached_transfer or modified:
+                    self._response['torrentp'].append([getattr(transfer, field) for field in self.Transfer._fields])
+
+            self._response['torrentm'] = []
+            for cache_transfer in cache:
+                if not filter(lambda transfer: cache_transfer.hash == transfer.hash, transfers):
+                    self._response['torrentm'].append(cached_transfer.hash)
+        else:
+            self._response['torrents'] = []
             for transfer in transfers:
                 self._response['torrents'].append([getattr(transfer, field) for field in self.Transfer._fields])
+
+        self._response['torrentc'] = self._write_cache(transfers)
 
     def action_start(self, *args, **kwargs):
         self.client.action_start(kwargs.get('hash'))
