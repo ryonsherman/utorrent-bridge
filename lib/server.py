@@ -1,8 +1,9 @@
+from lib import Interface
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
 
-class Server(object):
+class Server(Interface):
 
     class Handler(SimpleHTTPRequestHandler):
         _routes = {}
@@ -35,13 +36,14 @@ class Server(object):
             route = self._routes.get(path[0], self._routes['/'])
 
             args = {}
-            for field, value in [arg.split('=') for arg in path[1].split('&')]:
-                if args.get(field):
-                    if type(args[field]) != list:
-                        args[field] = [args[field]]
-                    args[field].append(value)
-                else:
-                    args[field] = value
+            if len(path) > 1:
+                for field, value in [arg.split('=') for arg in path[1].split('&')]:
+                    if args.get(field):
+                        if type(args[field]) != list:
+                            args[field] = [args[field]]
+                        args[field].append(value)
+                    else:
+                        args[field] = value
 
             if route['auth']:
                 method = '_auth_%s' % self.auth
