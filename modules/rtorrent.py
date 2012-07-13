@@ -1,26 +1,24 @@
+from lib import Action, Interface
 from lib.client import Client
 from lib.server import Server
 
 
-class rTorrent:
+class rTorrent(Interface):
 
     BUILD = '0.9.2'
 
-    # def get_transfers()
-
-    # def action_add_url()
-    # def action_start()
-    # def action_stop()
-    # def action_pause()
-    # def action_unpause()
-    # def action_recheck()
-    # def action_remove()
-    # def action_restart()
+    @Action.optional
+    def recheck(self, hash):
+        raise NotImplementedError
 
 
-class Client(Client):
+class Client(rTorrent, Client):
 
     class RPC:
+
+        @property
+        def _multicall(self):
+            return self._rpc.system.multicall
 
         def __init__(self, address, port):
             from xmlrpclib import Server
@@ -38,9 +36,6 @@ class Client(Client):
             for param in params:
                 calls.append({'methodName': method, 'params': [param]})
             return self._multicall(calls)
-
-        def _multicall(self, calls):
-            return self._rpc.system.multicall(calls)
 
     _methods = {
         'd.get_state': ['status'],
@@ -61,8 +56,9 @@ class Client(Client):
 
         self._rpc = self.RPC(self.address, self.port)
 
+    @Action.required
     def get_transfers(self, views=['main']):
-        hashes = self._rpc.call('download_list', views, False)
+        hashes = self._rpc.call('download_list', views, False) or []
 
         calls = []
         fields = {}
@@ -91,33 +87,41 @@ class Client(Client):
 
         return transfers
 
-    def action_start(self, hashes):
-        self._rpc.call('d.start', hashes)
+    @Action.required
+    def add_url(self, url):
+        self._rpc.call('load', url)
 
-    def action_stop(self, hashes):
-        self._rpc.call('d.close', hashes)
+    @Action.required
+    def start(self, hash):
+        self._rpc.call('d.start', hash)
 
-    def action_pause(self, hashes):
-        self._rpc.call('d.stop', hashes)
+    @Action.required
+    def stop(self, hash):
+        self._rpc.call('d.close', hash)
 
-    def action_unpause(self, hashes):
-        self._rpc.call('d.resume', hashes)
+    @Action.optional
+    def pause(self, hash):
+        self._rpc.call('d.stop', hash)
 
-    def action_recheck(self, hashes):
-        self._rpc.call('d.check_hash', hashes)
+    @Action.optional
+    def unpause(self, hash):
+        self._rpc.call('d.resume', hash)
 
-    def action_remove(self, hashes):
-        self._rpc.call('d.erase', hashes)
+    @Action.optional
+    def recheck(self, hash):
+        self._rpc.call('d.check_hash', hash)
 
-    def action_restart(self, hashes):
-        self.action_stop(hashes)
-        self.action_start(hashes)
+    @Action.required
+    def remove(self, hash):
+        self._rpc.call('d.erase', hash)
 
-    def action_add_url(self, urls):
-        self._rpc.call('load', urls)
+    @Action.optional
+    def restart(self, hash):
+        self.stop(hash)
+        self.start(hash)
 
 
-class Server(Server):
+class Server(rTorrent, Server):
 
     def __init__(self, *args, **kwargs):
         super(Server, self).__init__(*args, **kwargs)
