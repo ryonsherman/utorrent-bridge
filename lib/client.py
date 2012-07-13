@@ -1,4 +1,7 @@
-class Client(object):
+from lib import Interface
+
+
+class Client(Interface):
 
     def _request_http(self, string):
         from urllib2 import Request, urlopen
