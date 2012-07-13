@@ -3,14 +3,32 @@
 
 class uTorrentBridge:
 
-    def __init__(self, *args, **kwargs):
-        module = __import__('modules.%s' % kwargs['client']['module'], fromlist=('Client'))
-        client = getattr(module, 'Client')
-        self.client = client(**kwargs['client'])
+    def _validate_property(self, property, module_1, module_2):
+        # If module_1 property is an action
+        if hasattr(getattr(module_1, property), 'action_required'):
+            # If module_1 action is optional
+            if getattr(getattr(module_1, property), 'action_required', False) == False:
+                return True
+            # If module_2 does not have action
+            elif not hasattr(module_2, property):
+                return False
 
+        return True
+
+    def __init__(self, *args, **kwargs):
         module = __import__('modules.%s' % kwargs['server']['module'], fromlist=('Server'))
-        server = getattr(module, 'Server')
-        self.server = server(**kwargs['server'])
+        self.server = getattr(module, 'Server')(**kwargs['server'])
+
+        module = __import__('modules.%s' % kwargs['client']['module'], fromlist=('Client'))
+        self.client = getattr(module, 'Client')(**kwargs['client'])
+
+        for property in dir(self.server):
+            if not self._validate_property(property, self.server, self.client):
+                raise NotImplementedError("%s does not implement %s" % (self.server.__class__.__name__, property))
+
+        for property in dir(self.client):
+            if not self._validate_property(property, self.client, self.server):
+                raise NotImplementedError("%s does not implement %s" % (self.client.__class__.__name__, property))
 
         self.client.server = self.server
         self.server.client = self.client
