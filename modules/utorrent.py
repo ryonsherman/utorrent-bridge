@@ -245,7 +245,7 @@ class Server(uTorrent, Server):
 
     @Action.required
     def add_url(self, *args, **kwargs):
-        self.client.action_add_url(kwargs.get('s'))
+        self.client.add_url(kwargs.get('s'))
 
     @Action.required
     def start(self, *args, **kwargs):
@@ -261,24 +261,24 @@ class Server(uTorrent, Server):
 
     @Action.optional
     def unpause(self, *args, **kwargs):
-        getattr(self.client, 'action_unpause', self.client.action_start)(kwargs.get('hash'))
+        getattr(self.client, 'unpause', self.client.action_start)(kwargs.get('hash'))
 
     @Action.optional
     def recheck(self, *args, **kwargs):
-        self.client.action_recheck(kwargs.get('hash'))
+        self.client.recheck(kwargs.get('hash'))
 
     @Action.required
     def remove(self, *args, **kwargs):
-        self.client.action_remove(kwargs.get('hash'))
+        self.client.remove(kwargs.get('hash'))
 
     @Action.optional
     def removedata(self, *args, **kwargs):
-        getattr(self.client, 'action_removedata', self.client.remove)(kwargs.get('hash'))
+        getattr(self.client, 'removedata', self.client.remove)(kwargs.get('hash'))
 
     @Action.optional
     def restart(self, *args, **kwargs):
-        if not getattr(self.client, 'action_restart'):
-            self.action_stop(*args, **kwargs)
-            self.action_start(*args, **kwargs)
+        if not getattr(self.client, 'restart'):
+            self.stop(*args, **kwargs)
+            self.start(*args, **kwargs)
         else:
-            self.client.action_restart(kwargs.get('hash'))
+            self.client.restart(kwargs.get('hash'))
