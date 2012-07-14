@@ -58,10 +58,47 @@ class Client(rTorrent, Client):
         'f.get_priority': ['priority']
     }
 
+    _property_methods = {
+        'get_trackers': ['trackers'],
+        'get_upload_rate': ['ulrate'],
+        'get_download_rate': ['dlrate'],
+        'get_dht':  ['dht'],
+        'get_peer_exchange': ['pex'],
+        'get_max_uploads': ['ulslots'],
+    }
+
     def __init__(self, *args, **kwargs):
         super(Client, self).__init__(*args, **kwargs)
 
         self._rpc = self.RPC(self.address, self.port)
+
+    @Action.optional
+    def get_trackers(self, hash):
+        if type(hash) is str:
+            tracker_count = self._rpc.call('d.get_tracker_size', hash)
+
+            calls = []
+            for i in range(tracker_count):
+                calls.append({'methodName': 't.get_url', 'params': [hash, i]})
+
+            return "\n".join(self._rpc._multicall(calls)[0])
+        else:
+            tracker_count = [value[0] for value in self._rpc.call('d.get_tracker_size', hash)]
+            hashes = dict(zip(hash, tracker_count))
+
+            calls = []
+            for hash, tracker_count in hashes.iteritems():
+                for i in range(tracker_count):
+                    calls.append({'methodName': 't.get_url', 'params': [hash, i]})
+
+            return dict(zip(hashes, ["\n".join(value) for value in self._rpc._multicall(calls)]))
+
+    @Action.optional
+    def get_dht(self, hash):
+        if type(hash) is str:
+            return self._rpc.call('dht_statistics', hash).get('active')
+        else:
+            return dict(zip(hash, [value['active'] for value in self._rpc.call('dht_statistics', hash, True)]))
 
     @Action.required
     def get_transfers(self, views=['main']):
@@ -123,11 +160,41 @@ class Client(rTorrent, Client):
                             break
                 files[hash].append(file)
 
-        return files
+        return files.pop(0) if hash is type(str) else files
 
     @Action.required
     def get_properties(self, hash):
-        pass
+        hashes = [hash] if type(hash) is str else hash
+
+        calls = []
+        call_values = []
+        for hash in hashes:
+            for field in self.server.Properties._fields:
+                for method in self._property_methods:
+                    if field in self._property_methods[method]:
+                        if getattr(self, method, False) and hasattr(getattr(self, method), 'action_required'):
+                            call_values.append(getattr(self, method)(hash))
+                        else:
+                            calls.append({'methodName': method, 'params': [hash]})
+                        break
+
+        multicall_values = [value[0] for value in self._rpc._multicall(calls)]
+
+        properties = {}
+        for hash in hashes:
+            property = self.server.Properties()
+            property.hash = hash
+            for field in self.server.Properties._fields:
+                for method in self._property_methods:
+                    if field in self._property_methods[method]:
+                        if getattr(self, method, False) and hasattr(getattr(self, method), 'action_required'):
+                            setattr(property, field, call_values.pop(0))
+                        else:
+                            setattr(property, field, multicall_values.pop(0))
+                        break
+            properties[hash] = property
+
+        return properties.pop(0) if hash is type(str) else properties
 
     @Action.required
     def add_url(self, url):

@@ -38,6 +38,14 @@ class uTorrent(Interface):
     def _get_token(self):
         raise NotImplementedError
 
+    @Action.required
+    def get_files(self, hash):
+        raise NotImplementedError
+
+    @Action.required
+    def get_properties(self, hash):
+        raise NotImplementedError
+
     @Action.optional
     def forcestart(self, hash):
         raise NotImplementedError
@@ -48,10 +56,6 @@ class uTorrent(Interface):
 
     @Action.optional
     def removedata(self, hash):
-        raise NotImplementedError
-
-    @Action.optional
-    def getfiles(self, hash):
         raise NotImplementedError
 
     # def action_getprops()
@@ -149,15 +153,45 @@ class File(object):
     priority = 0
 
 
+class Properties(object):
+    _fields = [
+        'hash',
+        'trackers',
+        'ulrate',
+        'dlrate',
+        'superseed',
+        'dht',
+        'pex',
+        'seed_override',
+        'seed_ratio',
+        'seed_time',
+        'ulslots'
+    ]
+
+    hash = ''
+    trackers = ''
+    ulrate = 0
+    dlrate = 0
+    superseed = uTorrent.BOOLEAN.DISABLED
+    dht = uTorrent.BOOLEAN.DISABLED
+    pex = uTorrent.BOOLEAN.DISABLED
+    seed_override = uTorrent.BOOLEAN.DISABLED
+    seed_ratio = 0
+    seed_time = 0
+    ulslots = 0
+
+
 class Server(uTorrent, Server):
 
     Transfer = Transfer
     File = File
+    Properties = Properties
 
     _token_cache = []
     _response = {'build': uTorrent.BUILD}
     _methods = {
         'get_files': ['getfiles'],
+        'get_properties': ['getprops'],
     }
 
     def _get_token(self):
@@ -201,7 +235,7 @@ class Server(uTorrent, Server):
         file.close()
 
         # TODO: Should cache be removed after use?
-        #os.remove(filename)
+        os.remove(filename)
 
         return data
 
@@ -276,6 +310,14 @@ class Server(uTorrent, Server):
         self._response['files'] = []
         for hash, files in self.client.get_files(kwargs.get('hash')).iteritems():
             self._response['files'].extend([hash, [[getattr(file, field) for field in self.File._fields] for file in files]])
+
+    @Action.required
+    def get_properties(self, *args, **kwargs):
+        self._response = {'build': uTorrent.BUILD}
+
+        self._response['props'] = []
+        for hash, properties in self.client.get_properties(kwargs.get('hash')).iteritems():
+            self._response['props'].append(dict(zip(properties._fields, [getattr(properties, field) for field in properties._fields])))
 
     @Action.required
     def add_url(self, *args, **kwargs):
