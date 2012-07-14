@@ -37,7 +37,7 @@ class Client(rTorrent, Client):
                 calls.append({'methodName': method, 'params': [param]})
             return self._multicall(calls)
 
-    _methods = {
+    _transfer_methods = {
         'd.get_state': ['status'],
         'd.get_name': ['name'],
         'd.get_size_bytes': ['size'],
@@ -49,6 +49,13 @@ class Client(rTorrent, Client):
         'd.get_peers_accounted': ['peers_connected'],
         'd.get_peers_complete': ['seeds_connected'],
         'd.get_left_bytes': ['remaining']
+    }
+
+    _file_methods = {
+        'f.get_path': ['name'],
+        'f.get_size_bytes': ['size'],
+        'f.get_completed_chunks': ['size_downloaded'],
+        'f.get_priority': ['priority']
     }
 
     def __init__(self, *args, **kwargs):
@@ -64,28 +71,59 @@ class Client(rTorrent, Client):
         fields = {}
         for hash in hashes:
             fields[hash] = []
-            for field in dir(self.server.Transfer):
-                for method in self._methods.keys():
-                    if field in self._methods[method]:
+            for field in self.server.Transfer._fields:
+                for method in self._transfer_methods:
+                    if field in self._transfer_methods[method]:
                         calls.append({'methodName': method, 'params': [hash]})
                         fields[hash].append(field)
+                        break
+
+        values = [value[0] for value in self._rpc._multicall(calls)]
 
         transfers = []
-        if calls:
-            values = self._rpc._multicall(calls)
+        for hash in hashes:
+            transfer = self.server.Transfer()
+            transfer.hash = hash
 
-            index = 0
-            for hash in hashes:
-                transfer = self.server.Transfer()
-                transfer.hash = hash
-
-                for field in fields[hash]:
-                    setattr(transfer, field, values[index][0])
-                    index += 1
-
-                transfers.append(transfer)
+            for field in transfer._fields:
+                for method in self._transfer_methods:
+                    if field in self._transfer_methods[method]:
+                        setattr(transfer, field, values.pop(0))
+                        break
+            transfers.append(transfer)
 
         return transfers
+
+    @Action.required
+    def get_files(self, hash):
+        hashes = [hash] if type(hash) is str else hash
+        file_count = [value[0] for value in self._rpc.call('d.get_size_files', hashes)]
+        hashes = dict(zip(hashes, file_count))
+
+        calls = []
+        for hash, file_count in hashes.iteritems():
+            for i in range(file_count):
+                for field in self.server.File._fields:
+                    for method in self._file_methods:
+                        if field in self._file_methods[method]:
+                            calls.append({'methodName': method, 'params': [hash, i]})
+                            break
+
+        values = [value[0] for value in self._rpc._multicall(calls)]
+
+        files = {}
+        for hash, file_count in hashes.iteritems():
+            files[hash] = []
+            for i in range(file_count):
+                file = self.server.File()
+                for field in file._fields:
+                    for method in self._file_methods:
+                        if field in self._file_methods[method]:
+                            setattr(file, field, values.pop(0))
+                            break
+                files[hash].append(file)
+
+        return files
 
     @Action.required
     def add_url(self, url):
