@@ -50,7 +50,10 @@ class uTorrent(Interface):
     def removedata(self, hash):
         raise NotImplementedError
 
-    # def action_getfiles()
+    @Action.optional
+    def getfiles(self, hash):
+        raise NotImplementedError
+
     # def action_getprops()
     # def action_getsettings()
     # def action_setsetting()
@@ -85,7 +88,7 @@ class Client(uTorrent, Client):
         self._token = self.get_token()
 
 
-class Transfer:
+class Transfer(object):
     _fields = [
         'hash',
         'status',
@@ -132,12 +135,30 @@ class Transfer:
         return int(self.downloaded / self.size * 1000) if self.size else 0
 
 
+class File(object):
+    _fields = [
+        'name',
+        'size',
+        'size_downloaded',
+        'priority',
+    ]
+
+    name = ''
+    size = 0
+    size_downloaded = 0
+    priority = 0
+
+
 class Server(uTorrent, Server):
 
     Transfer = Transfer
+    File = File
 
     _token_cache = []
     _response = {'build': uTorrent.BUILD}
+    _methods = {
+        'get_files': ['getfiles'],
+    }
 
     def _get_token(self):
         from uuid import uuid4 as generate_token
@@ -205,7 +226,12 @@ class Server(uTorrent, Server):
 
         action = kwargs.get('action')
         if action:
+            del kwargs['action']
             action = action.replace('-', '_')
+            for method in self._methods.keys():
+                if action in self._methods[method]:
+                    action = method
+                    break
             if hasattr(self, action) and hasattr(getattr(self, action), 'action_required'):
                 action = getattr(self, action)
                 action(**kwargs)
@@ -242,6 +268,14 @@ class Server(uTorrent, Server):
                 self._response['torrents'].append([getattr(transfer, field) for field in self.Transfer._fields])
 
         self._response['torrentc'] = self._write_cache(transfers)
+
+    @Action.required
+    def get_files(self, *args, **kwargs):
+        self._response = {'build': uTorrent.BUILD}
+
+        self._response['files'] = []
+        for hash, files in self.client.get_files(kwargs.get('hash')).iteritems():
+            self._response['files'].extend([hash, [[getattr(file, field) for field in self.File._fields] for file in files]])
 
     @Action.required
     def add_url(self, *args, **kwargs):
