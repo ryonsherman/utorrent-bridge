@@ -126,32 +126,36 @@ class Client(rTorrent, Client):
         return files
 
     @Action.required
+    def get_properties(self, hash):
+        pass
+
+    @Action.required
     def add_url(self, url):
-        self._rpc.call('load', url)
+        self._rpc.call('load', url, False if type(url) is str else True)
 
     @Action.required
     def start(self, hash):
-        self._rpc.call('d.start', hash)
+        self._rpc.call('start', hash, False if type(hash) is str else True)
 
     @Action.required
     def stop(self, hash):
-        self._rpc.call('d.close', hash)
+        self._rpc.call('close', hash, False if type(hash) is str else True)
 
     @Action.optional
     def pause(self, hash):
-        self._rpc.call('d.stop', hash)
+        self._rpc.call('stop', hash, False if type(hash) is str else True)
 
     @Action.optional
     def unpause(self, hash):
-        self._rpc.call('d.resume', hash)
+        self._rpc.call('resume', hash, False if type(hash) is str else True)
 
     @Action.optional
     def recheck(self, hash):
-        self._rpc.call('d.check_hash', hash)
+        self._rpc.call('check_hash', hash, False if type(hash) is str else True)
 
     @Action.required
     def remove(self, hash):
-        self._rpc.call('d.erase', hash)
+        self._rpc.call('erase', hash, False if type(hash) is str else True)
 
     @Action.optional
     def restart(self, hash):
