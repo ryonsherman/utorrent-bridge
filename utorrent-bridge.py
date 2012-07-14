@@ -24,11 +24,11 @@ class uTorrentBridge:
 
         for property in dir(self.server):
             if not self._validate_property(property, self.server, self.client):
-                raise NotImplementedError("%s does not implement %s" % (self.server.__class__.__name__, property))
+                raise NotImplementedError("Client module '%s' does not implement %s" % (self.client.__class__.__bases__[0].__name__, property))
 
         for property in dir(self.client):
             if not self._validate_property(property, self.client, self.server):
-                raise NotImplementedError("%s does not implement %s" % (self.client.__class__.__name__, property))
+                raise NotImplementedError("Server module '%s' does not implement %s" % (self.server.__class__.__bases__[0].__name__, property))
 
         self.client.server = self.server
         self.server.client = self.client
