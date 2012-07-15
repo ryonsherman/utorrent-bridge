@@ -17,7 +17,7 @@ class Client(rTorrent, Client):
     class RPC:
 
         @property
-        def _multicall(self):
+        def multicall(self):
             return self._rpc.system.multicall
 
         def __init__(self, address, port):
@@ -27,7 +27,7 @@ class Client(rTorrent, Client):
 
         def call(self, method, params, multicall=False):
             if type(params) == list and multicall:
-                response = self._multicall([{'methodName': method, 'params': [param]} for param in params])
+                response = self.multicall([{'methodName': method, 'params': [param]} for param in params])
             else:
                 response = getattr(self._rpc, method)(params)
 
@@ -36,11 +36,6 @@ class Client(rTorrent, Client):
                 open(self.log, 'a+b').write("[%s] %s\n" % (datetime.now(), str(response)))
 
             return response
-
-        def multicall(self, methods):
-            # TODO: pass dict of methods, replace _rpc._multicall calls
-            for method, params in methods.items():
-                pass
 
     _transfer_methods = {
         'd.get_state': ['status'],
@@ -51,8 +46,12 @@ class Client(rTorrent, Client):
         'd.get_ratio': ['ratio'],
         'd.get_up_rate': ['upload_speed'],
         'd.get_down_rate': ['download_speed'],
+        '_transfer_eta': ['eta'],
         'd.get_peers_accounted': ['peers_connected'],
+        '_transfer_peers_total': ['peers_in_swarm'],
         'd.get_peers_complete': ['seeds_connected'],
+        '_transfer_seeds_total': ['seeds_in_swarm'],
+        '_transfer_availability': ['availability'],
         'd.get_left_bytes': ['remaining']
     }
 
@@ -72,35 +71,65 @@ class Client(rTorrent, Client):
         'get_max_uploads': ['ulslots'],
     }
 
+    def _transfer_eta(self, hash):
+        calls = [
+            {'methodName': 'd.get_left_bytes', 'params': [hash]},
+            {'methodName': 'd.get_down_rate', 'params': [hash]}
+        ]
+        size_left, download_speed = [value[0] for value in self._rpc.multicall(calls)]
+
+        return 0 if not download_speed else size_left / download_speed
+
+    def _transfer_peers_total(self, hash):
+        if type(hash) is str:
+            tracker_count = self._rpc.call('d.get_tracker_size', hash)
+            calls = [{'methodName': 't.get_scrape_incomplete', 'params': [hash, i]} for i in range(tracker_count)]
+            return sum([value[0] for value in self._rpc.multicall(calls)])
+        else:
+            tracker_count = [value[0] for value in self._rpc.call('d.get_tracker_size', hash, True)]
+            hashes = dict(zip(hash, tracker_count))
+            calls = [[{'methodName': 't.get_scrape_incomplete', 'params': [hash, i]} for i in range(tracker_count)] for hash, tracker_count in hashes.items()]
+            return dict(zip(hashes, [sum(value) for value in self._rpc.multicall(calls)]))
+
+    def _transfer_seeds_total(self, hash):
+        if type(hash) is str:
+            tracker_count = self._rpc.call('d.get_tracker_size', hash)
+            calls = [{'methodName': 't.get_scrape_complete', 'params': [hash, i]} for i in range(tracker_count)]
+            return sum([value[0] for value in self._rpc.multicall(calls)])
+        else:
+            tracker_count = [value[0] for value in self._rpc.call('d.get_tracker_size', hash, True)]
+            hashes = dict(zip(hash, tracker_count))
+            calls = [[{'methodName': 't.get_scrape_complete', 'params': [hash, i]} for i in range(tracker_count)] for hash, tracker_count in hashes.items()]
+            return dict(zip(hashes, [sum(value) for value in self._rpc.multicall(calls)]))
+
+    def _transfer_availability(self, hash):
+        from math import floor
+
+        peers_total = self._transfer_peers_total(hash)
+        seeds_total = self._transfer_seeds_total(hash)
+
+        return 0 if not peers_total or not seeds_total else floor(seeds_total / peers_total) * 0x10000
+
     def _file_size_downloaded(self, hash, index):
         calls = [
             {'methodName': 'f.get_size_bytes', 'params': [hash, index]},
             {'methodName': 'f.get_size_chunks', 'params': [hash, index]},
             {'methodName': 'f.get_completed_chunks', 'params': [hash, index]}
         ]
-        size, chunks_total, chunks_completed = [value[0] for value in self._rpc._multicall(calls)]
+        size, chunks_total, chunks_completed = [value[0] for value in self._rpc.multicall(calls)]
 
         return (size / chunks_total) * chunks_completed
 
     def _property_trackers(self, hash):
         if type(hash) is str:
             tracker_count = self._rpc.call('d.get_tracker_size', hash)
-
-            calls = []
-            for i in range(tracker_count):
-                calls.append({'methodName': 't.get_url', 'params': [hash, i]})
-
-            return "\n".join(self._rpc._multicall(calls)[0])
+            calls = [{'methodName': 't.get_url', 'params': [hash, i]} for i in range(tracker_count)]
+            return "\n".join(self._rpc.multicall(calls)[0])
         else:
             tracker_count = [value[0] for value in self._rpc.call('d.get_tracker_size', hash, True)]
             hashes = dict(zip(hash, tracker_count))
-
-            calls = []
-            for hash, tracker_count in hashes.items():
-                for i in range(tracker_count):
-                    calls.append({'methodName': 't.get_url', 'params': [hash, i]})
-
-            return dict(zip(hashes, ["\n".join(value) for value in self._rpc._multicall(calls)]))
+            calls = [[{'methodName': 't.get_url', 'params': [hash, i]} for i in range(tracker_count)] for hash, tracker_count in hashes.items()]
+            return dict(zip(hashes, ["\n".join(value) for value in self._rpc.multicall(calls)]))
 
     def _property_dht(self, hash):
         if type(hash) is str:
@@ -130,7 +159,7 @@ class Client(rTorrent, Client):
                             calls.append({'methodName': method, 'params': [hash]})
                         break
 
-        multicall_values = [value[0] for value in self._rpc._multicall(calls)]
+        multicall_values = [value[0] for value in self._rpc.multicall(calls)]
 
         transfers = []
         for hash in hashes:
@@ -165,7 +194,7 @@ class Client(rTorrent, Client):
                                 calls.append({'methodName': method, 'params': [hash, i]})
                             break
 
-        multicall_values = [value[0] for value in self._rpc._multicall(calls)]
+        multicall_values = [value[0] for value in self._rpc.multicall(calls)]
 
         files = {}
         for hash, file_count in hashes.items():
@@ -197,7 +226,7 @@ class Client(rTorrent, Client):
                             calls.append({'methodName': method, 'params': [hash]})
                         break
 
-        multicall_values = [value[0] for value in self._rpc._multicall(calls)]
+        multicall_values = [value[0] for value in self._rpc.multicall(calls)]
 
         properties = {}
         for hash in hashes:
