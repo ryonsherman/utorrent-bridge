@@ -1,11 +1,11 @@
 from lib import Interface
-from BaseHTTPServer import HTTPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from urllib2 import unquote
+
 
 class Server(Interface):
 
-    class Handler(SimpleHTTPRequestHandler):
+    class Handler(BaseHTTPRequestHandler):
         _routes = {}
 
         def _response_auth(self):
@@ -55,6 +55,17 @@ class Server(Interface):
 
             self._response_default(route['callback'](**args))
 
+        def log_message(self, format, *args):
+            message = "%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(), format % args)
+
+            if self.log:
+                file = open(self.log, 'a+b')
+                file.write(message)
+                file.close()
+
+            import sys
+            sys.stderr.write(message)
+
     def __init__(self, *args, **kwargs):
         self.address = kwargs['address']
         self.port = int(kwargs['port'])
@@ -64,6 +75,7 @@ class Server(Interface):
         handler.auth = kwargs.get('auth')
         handler.username = kwargs.get('username')
         handler.password = kwargs.get('password')
+        handler.log = kwargs.get('log')
 
         self._server = HTTPServer((self.address, self.port), handler)
         self._add_route('/', self.route_default)
