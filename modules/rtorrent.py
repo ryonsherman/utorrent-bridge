@@ -25,7 +25,7 @@ class Client(rTorrent, Client):
 
             self._rpc = Server("http://%s:%s/RPC2" % (address, port))
 
-        def call(self, method, params, multicall=True):
+        def call(self, method, params, multicall=False):
             if type(params) == list and multicall:
                 response = self._multicall([{'methodName': method, 'params': [param]} for param in params])
             else:
@@ -33,15 +33,13 @@ class Client(rTorrent, Client):
 
             if self.log:
                 from datetime import datetime
-                file = open(self.log, 'a+b')
-                file.write("[%s] %s\n" % (datetime.now(), str(response)))
-                file.close()
+                open(self.log, 'a+b').write("[%s] %s\n" % (datetime.now(), str(response)))
 
             return response
 
         def multicall(self, methods):
             # TODO: pass dict of methods, replace _rpc._multicall calls
-            for method, params in methods.iteritems():
+            for method, params in methods.items():
                 pass
 
     _transfer_methods = {
@@ -94,11 +92,11 @@ class Client(rTorrent, Client):
 
             return "\n".join(self._rpc._multicall(calls)[0])
         else:
-            tracker_count = [value[0] for value in self._rpc.call('d.get_tracker_size', hash)]
+            tracker_count = [value[0] for value in self._rpc.call('d.get_tracker_size', hash, True)]
             hashes = dict(zip(hash, tracker_count))
 
             calls = []
-            for hash, tracker_count in hashes.iteritems():
+            for hash, tracker_count in hashes.items():
                 for i in range(tracker_count):
                     calls.append({'methodName': 't.get_url', 'params': [hash, i]})
 
@@ -118,7 +116,7 @@ class Client(rTorrent, Client):
 
     @Action.required
     def get_transfers(self, views=['main']):
-        hashes = self._rpc.call('download_list', views, False) or []
+        hashes = self._rpc.call('download_list', views) or []
 
         calls = []
         call_values = []
@@ -151,12 +149,12 @@ class Client(rTorrent, Client):
     @Action.required
     def get_files(self, hash):
         hashes = [hash] if type(hash) is str else hash
-        file_count = [value[0] for value in self._rpc.call('d.get_size_files', hashes)]
+        file_count = [value[0] for value in self._rpc.call('d.get_size_files', hashes, True)]
         hashes = dict(zip(hashes, file_count))
 
         calls = []
         call_values = []
-        for hash, file_count in hashes.iteritems():
+        for hash, file_count in hashes.items():
             for i in range(file_count):
                 for field in self.server.File._fields:
                     for method in self._file_methods:
@@ -170,7 +168,7 @@ class Client(rTorrent, Client):
         multicall_values = [value[0] for value in self._rpc._multicall(calls)]
 
         files = {}
-        for hash, file_count in hashes.iteritems():
+        for hash, file_count in hashes.items():
             files[hash] = []
             for i in range(file_count):
                 file = self.server.File()
@@ -220,31 +218,36 @@ class Client(rTorrent, Client):
 
     @Action.required
     def add_url(self, url):
-        self._rpc.call('load', url, False if type(url) is str else True)
+        self._rpc.call('load', url, type(url) is list)
+
+    @Action.optional
+    def add_file(self, file):
+        from xmlrpclib import Binary
+        self._rpc.call('load_raw', Binary(file))
 
     @Action.required
     def start(self, hash):
-        self._rpc.call('d.start', hash, False if type(hash) is str else True)
+        self._rpc.call('d.start', hash, type(hash) is list)
 
     @Action.required
     def stop(self, hash):
-        self._rpc.call('d.close', hash, False if type(hash) is str else True)
+        self._rpc.call('d.close', hash, type(hash) is list)
 
     @Action.optional
     def pause(self, hash):
-        self._rpc.call('d.stop', hash, False if type(hash) is str else True)
+        self._rpc.call('d.stop', hash, type(hash) is list)
 
     @Action.optional
     def unpause(self, hash):
-        self._rpc.call('d.resume', hash, False if type(hash) is str else True)
+        self._rpc.call('d.resume', hash, type(hash) is list)
 
     @Action.optional
     def recheck(self, hash):
-        self._rpc.call('d.check_hash', hash, False if type(hash) is str else True)
+        self._rpc.call('d.check_hash', hash, type(hash) is list)
 
     @Action.required
     def remove(self, hash):
-        self._rpc.call('d.erase', hash, False if type(hash) is str else True)
+        self._rpc.call('d.erase', hash, type(hash) is list)
 
     @Action.optional
     def restart(self, hash):

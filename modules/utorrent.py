@@ -306,7 +306,7 @@ class Server(uTorrent, Server):
         self._response = {'build': uTorrent.BUILD}
 
         self._response['files'] = []
-        for hash, files in self.client.get_files(kwargs.get('hash')).iteritems():
+        for hash, files in self.client.get_files(kwargs.get('hash')).items():
             self._response['files'].extend([hash, [[getattr(file, field) for field in self.File._fields] for file in files]])
 
     @Action.required
@@ -314,12 +314,16 @@ class Server(uTorrent, Server):
         self._response = {'build': uTorrent.BUILD}
 
         self._response['props'] = []
-        for hash, properties in self.client.get_properties(kwargs.get('hash')).iteritems():
+        for hash, properties in self.client.get_properties(kwargs.get('hash')).items():
             self._response['props'].append(dict(zip(properties._fields, [getattr(properties, field) for field in properties._fields])))
 
     @Action.required
     def add_url(self, *args, **kwargs):
         self.client.add_url(kwargs.get('s'))
+
+    @Action.optional
+    def add_file(self, *args, **kwargs):
+        self.client.add_file(kwargs.get('torrent_file'))
 
     @Action.required
     def start(self, *args, **kwargs):
