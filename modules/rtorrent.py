@@ -54,26 +54,30 @@ class Client(rTorrent, Client):
     _file_methods = {
         'f.get_path': ['name'],
         'f.get_size_bytes': ['size'],
-        'f.get_completed_chunks': ['size_downloaded'],
+        '_file_size_downloaded': ['size_downloaded'],
         'f.get_priority': ['priority']
     }
 
     _property_methods = {
-        'get_trackers': ['trackers'],
+        '_property_trackers': ['trackers'],
         'get_upload_rate': ['ulrate'],
         'get_download_rate': ['dlrate'],
-        'get_dht':  ['dht'],
+        '_property_dht':  ['dht'],
         'get_peer_exchange': ['pex'],
         'get_max_uploads': ['ulslots'],
     }
 
-    def __init__(self, *args, **kwargs):
-        super(Client, self).__init__(*args, **kwargs)
+    def _file_size_downloaded(self, hash, index):
+        calls = [
+            {'methodName': 'f.get_size_bytes', 'params': [hash, index]},
+            {'methodName': 'f.get_size_chunks', 'params': [hash, index]},
+            {'methodName': 'f.get_completed_chunks', 'params': [hash, index]}
+        ]
+        size, chunks_total, chunks_completed = [value[0] for value in self._rpc._multicall(calls)]
 
-        self._rpc = self.RPC(self.address, self.port)
+        return (size / chunks_total) * chunks_completed
 
-    @Action.optional
-    def get_trackers(self, hash):
+    def _property_trackers(self, hash):
         if type(hash) is str:
             tracker_count = self._rpc.call('d.get_tracker_size', hash)
 
@@ -93,29 +97,34 @@ class Client(rTorrent, Client):
 
             return dict(zip(hashes, ["\n".join(value) for value in self._rpc._multicall(calls)]))
 
-    @Action.optional
-    def get_dht(self, hash):
+    def _property_dht(self, hash):
         if type(hash) is str:
             return self._rpc.call('dht_statistics', hash).get('active')
         else:
             return dict(zip(hash, [value['active'] for value in self._rpc.call('dht_statistics', hash, True)]))
+
+    def __init__(self, *args, **kwargs):
+        super(Client, self).__init__(*args, **kwargs)
+
+        self._rpc = self.RPC(self.address, self.port)
 
     @Action.required
     def get_transfers(self, views=['main']):
         hashes = self._rpc.call('download_list', views, False) or []
 
         calls = []
-        fields = {}
+        call_values = []
         for hash in hashes:
-            fields[hash] = []
             for field in self.server.Transfer._fields:
                 for method in self._transfer_methods:
                     if field in self._transfer_methods[method]:
-                        calls.append({'methodName': method, 'params': [hash]})
-                        fields[hash].append(field)
+                        if getattr(self, method, False):
+                            call_values.append(getattr(self, method)(hash))
+                        else:
+                            calls.append({'methodName': method, 'params': [hash]})
                         break
 
-        values = [value[0] for value in self._rpc._multicall(calls)]
+        multicall_values = [value[0] for value in self._rpc._multicall(calls)]
 
         transfers = []
         for hash in hashes:
@@ -125,7 +134,7 @@ class Client(rTorrent, Client):
             for field in transfer._fields:
                 for method in self._transfer_methods:
                     if field in self._transfer_methods[method]:
-                        setattr(transfer, field, values.pop(0))
+                        setattr(transfer, field, call_values.pop(0) if getattr(self, method, False) else  multicall_values.pop(0))
                         break
             transfers.append(transfer)
 
@@ -138,15 +147,19 @@ class Client(rTorrent, Client):
         hashes = dict(zip(hashes, file_count))
 
         calls = []
+        call_values = []
         for hash, file_count in hashes.iteritems():
             for i in range(file_count):
                 for field in self.server.File._fields:
                     for method in self._file_methods:
                         if field in self._file_methods[method]:
-                            calls.append({'methodName': method, 'params': [hash, i]})
+                            if getattr(self, method, False):
+                                call_values.append(getattr(self, method)(hash, i))
+                            else:
+                                calls.append({'methodName': method, 'params': [hash, i]})
                             break
 
-        values = [value[0] for value in self._rpc._multicall(calls)]
+        multicall_values = [value[0] for value in self._rpc._multicall(calls)]
 
         files = {}
         for hash, file_count in hashes.iteritems():
@@ -156,7 +169,7 @@ class Client(rTorrent, Client):
                 for field in file._fields:
                     for method in self._file_methods:
                         if field in self._file_methods[method]:
-                            setattr(file, field, values.pop(0))
+                            setattr(file, field, call_values.pop(0) if getattr(self, method, False) else  multicall_values.pop(0))
                             break
                 files[hash].append(file)
 
@@ -172,7 +185,7 @@ class Client(rTorrent, Client):
             for field in self.server.Properties._fields:
                 for method in self._property_methods:
                     if field in self._property_methods[method]:
-                        if getattr(self, method, False) and hasattr(getattr(self, method), 'action_required'):
+                        if getattr(self, method, False):
                             call_values.append(getattr(self, method)(hash))
                         else:
                             calls.append({'methodName': method, 'params': [hash]})
@@ -184,10 +197,11 @@ class Client(rTorrent, Client):
         for hash in hashes:
             property = self.server.Properties()
             property.hash = hash
-            for field in self.server.Properties._fields:
+
+            for field in property._fields:
                 for method in self._property_methods:
                     if field in self._property_methods[method]:
-                        if getattr(self, method, False) and hasattr(getattr(self, method), 'action_required'):
+                        if getattr(self, method, False):
                             setattr(property, field, call_values.pop(0))
                         else:
                             setattr(property, field, multicall_values.pop(0))
@@ -202,27 +216,27 @@ class Client(rTorrent, Client):
 
     @Action.required
     def start(self, hash):
-        self._rpc.call('start', hash, False if type(hash) is str else True)
+        self._rpc.call('d.start', hash, False if type(hash) is str else True)
 
     @Action.required
     def stop(self, hash):
-        self._rpc.call('close', hash, False if type(hash) is str else True)
+        self._rpc.call('d.close', hash, False if type(hash) is str else True)
 
     @Action.optional
     def pause(self, hash):
-        self._rpc.call('stop', hash, False if type(hash) is str else True)
+        self._rpc.call('d.stop', hash, False if type(hash) is str else True)
 
     @Action.optional
     def unpause(self, hash):
-        self._rpc.call('resume', hash, False if type(hash) is str else True)
+        self._rpc.call('d.resume', hash, False if type(hash) is str else True)
 
     @Action.optional
     def recheck(self, hash):
-        self._rpc.call('check_hash', hash, False if type(hash) is str else True)
+        self._rpc.call('d.check_hash', hash, False if type(hash) is str else True)
 
     @Action.required
     def remove(self, hash):
-        self._rpc.call('erase', hash, False if type(hash) is str else True)
+        self._rpc.call('d.erase', hash, False if type(hash) is str else True)
 
     @Action.optional
     def restart(self, hash):
