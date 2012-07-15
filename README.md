@@ -1,6 +1,8 @@
 Overview
 --------
-**uTorrent Bridge** is a compatibility layer for the [uTorrent][utorrent] [Web API][utorrent_api]. It allows you to perform native API requests on foreign backend servers. This enables the use of uTorrent remotes such as [uRemote][uremote] and [Torrent-fu][torrentfu] on non-uTorrent servers.
+**uTorrent Bridge** is a compatibility layer for the [uTorrent][utorrent] [Web API][utorrent_api].
+
+This allows you to perform native API requests on foreign backend servers. This enables the use of uTorrent clients such as [uRemote][uremote] and [Torrent-fu][torrentfu] on non-uTorrent servers.
 
 Supported Modules
 -----------------
@@ -13,7 +15,7 @@ Supported Modules
 [utorrent]: http://www.utorrent.com
 [utorrent_api]: http://www.utorrent.com/community/developers/webapi
 [uremote]: http://uremote.blogspot.com
-[turrentfu]: http://torrent-fu.com
+[torrentfu]: http://torrent-fu.com
 [rtorrent]: http://libtorrent.rakshasa.no
 [transmission]: http://www.transmissionbt.com
 [sabnzbd]: http://sabnzbd.org
