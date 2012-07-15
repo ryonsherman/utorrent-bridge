@@ -58,7 +58,6 @@ class uTorrent(Interface):
     def removedata(self, hash):
         raise NotImplementedError
 
-    # def action_getprops()
     # def action_getsettings()
     # def action_setsetting()
     # def action_setprio()
@@ -233,9 +232,6 @@ class Server(uTorrent, Server):
         file = open(filename, 'rb')
         data = pickle.load(file)
         file.close()
-
-        # TODO: Should cache be removed after use?
-        os.remove(filename)
 
         return data
 
