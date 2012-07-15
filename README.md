@@ -9,6 +9,7 @@ Supported Modules
 ### Development:
  * **[rTorrent][rtorrent]** - Text-based ncurses BitTorrent client for Unix.
  * **[Transmission][transmission]** - BitTorrent client that runs natively on multiple operating systems.
+ * **[Deluge][deluge]** - Open source, cross-platform BitTorrent client.
  * **[SABnzb+][sabnzbd]** - Open source, NZB capable binary newsgrabber written in Python, server-oriented using a web-interface.
  * **[Hellanzb][hellanzb]** - Open Source application able to retrieve nzb files and fully process them.
 
@@ -20,3 +21,4 @@ Supported Modules
 [transmission]: http://www.transmissionbt.com
 [sabnzbd]: http://sabnzbd.org
 [hellanzb]: http://www.hellanzb.com
+[deluge]: http://deluge-torrent.org
