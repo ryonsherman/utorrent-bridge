@@ -1,12 +1,22 @@
 Overview
 --------
-**uTorrent Bridge** allows you to perform native [uTorrent][utorrent] WebUI requests on non-native servers. This enables the use of uTorrent remotes such as [uRemote](http://uremote.blogspot.com/) and [Torrent-fu](http://torrent-fu.com/) on non-uTorrent servers.
+**uTorrent Bridge** is a compatibility layer for the [uTorrent][utorrent] [Web API][utorrent_api].
 
-Supported Servers
+This allows you to perform native API requests on foreign backend servers. This enables the use of uTorrent clients such as [uRemote][uremote] and [Torrent-fu][torrentfu] on non-uTorrent servers.
+
+Supported Modules
 -----------------
 ### Development:
  * **[rTorrent][rtorrent]** - Text-based ncurses BitTorrent client for Unix.
- * More to come...
+ * **[Transmission][transmission]** - BitTorrent client that runs natively on multiple operating systems.
+ * **[SABnzb+][sabnzbd]** - Open source, NZB capable binary newsgrabber written in Python, server-oriented using a web-interface.
+ * **[Hellanzb][hellanzb]** - Open Source application able to retrieve nzb files and fully process them.
 
-[utorrent]: http://www.utorrent.com/
-[rtorrent]: http://libtorrent.rakshasa.no/
+[utorrent]: http://www.utorrent.com
+[utorrent_api]: http://www.utorrent.com/community/developers/webapi
+[uremote]: http://uremote.blogspot.com
+[torrentfu]: http://torrent-fu.com
+[rtorrent]: http://libtorrent.rakshasa.no
+[transmission]: http://www.transmissionbt.com
+[sabnzbd]: http://sabnzbd.org
+[hellanzb]: http://www.hellanzb.com
