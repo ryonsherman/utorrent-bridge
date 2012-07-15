@@ -264,7 +264,7 @@ class Server(uTorrent, Server):
                 if action in self._methods[method]:
                     action = method
                     break
-            if hasattr(self, action) and hasattr(getattr(self, action), 'action_required'):
+            if hasattr(self, action) and hasattr(getattr(self, action), 'action'):
                 action = getattr(self, action)
                 action(**kwargs)
 
@@ -339,7 +339,7 @@ class Server(uTorrent, Server):
 
     @Action.optional
     def unpause(self, *args, **kwargs):
-        getattr(self.client, 'unpause', self.client.action_start)(kwargs.get('hash'))
+        getattr(self.client, 'unpause', self.client.start)(kwargs.get('hash'))
 
     @Action.optional
     def recheck(self, *args, **kwargs):
