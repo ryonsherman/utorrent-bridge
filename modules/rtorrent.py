@@ -37,40 +37,6 @@ class Client(rTorrent, Client):
 
             return response
 
-    _transfer_methods = {
-        'd.get_state': ['status'],
-        'd.get_name': ['name'],
-        'd.get_size_bytes': ['size'],
-        'd.get_completed_bytes': ['downloaded'],
-        'd.get_up_total': ['uploaded'],
-        'd.get_ratio': ['ratio'],
-        'd.get_up_rate': ['upload_speed'],
-        'd.get_down_rate': ['download_speed'],
-        '_transfer_eta': ['eta'],
-        'd.get_peers_accounted': ['peers_connected'],
-        '_transfer_peers_total': ['peers_in_swarm'],
-        'd.get_peers_complete': ['seeds_connected'],
-        '_transfer_seeds_total': ['seeds_in_swarm'],
-        '_transfer_availability': ['availability'],
-        'd.get_left_bytes': ['remaining']
-    }
-
-    _file_methods = {
-        'f.get_path': ['name'],
-        'f.get_size_bytes': ['size'],
-        '_file_size_downloaded': ['size_downloaded'],
-        'f.get_priority': ['priority']
-    }
-
-    _property_methods = {
-        '_property_trackers': ['trackers'],
-        'get_upload_rate': ['ulrate'],
-        'get_download_rate': ['dlrate'],
-        '_property_dht':  ['dht'],
-        'get_peer_exchange': ['pex'],
-        'get_max_uploads': ['ulslots'],
-    }
-
     def _transfer_eta(self, hash):
         calls = [
             {'methodName': 'd.get_left_bytes', 'params': [hash]},
@@ -137,6 +103,40 @@ class Client(rTorrent, Client):
         else:
             return dict(zip(hash, [value['active'] for value in self._rpc.call('dht_statistics', hash, True)]))
 
+    _transfer_methods = {
+        'd.get_state': ['status'],
+        'd.get_name': ['name'],
+        'd.get_size_bytes': ['size'],
+        'd.get_completed_bytes': ['downloaded'],
+        'd.get_up_total': ['uploaded'],
+        'd.get_ratio': ['ratio'],
+        'd.get_up_rate': ['upload_speed'],
+        'd.get_down_rate': ['download_speed'],
+        _transfer_eta: ['eta'],
+        'd.get_peers_accounted': ['peers_connected'],
+        _transfer_peers_total: ['peers_in_swarm'],
+        'd.get_peers_complete': ['seeds_connected'],
+        _transfer_seeds_total: ['seeds_in_swarm'],
+        _transfer_availability: ['availability'],
+        'd.get_left_bytes': ['remaining']
+    }
+
+    _file_methods = {
+        'f.get_path': ['name'],
+        'f.get_size_bytes': ['size'],
+        _file_size_downloaded: ['size_downloaded'],
+        'f.get_priority': ['priority']
+    }
+
+    _property_methods = {
+        _property_trackers: ['trackers'],
+        'get_upload_rate': ['ulrate'],
+        'get_download_rate': ['dlrate'],
+        _property_dht:  ['dht'],
+        'get_peer_exchange': ['pex'],
+        'get_max_uploads': ['ulslots'],
+    }
+
     def __init__(self, *args, **kwargs):
         super(Client, self).__init__(*args, **kwargs)
 
@@ -153,8 +153,8 @@ class Client(rTorrent, Client):
             for field in self.server.Transfer._fields:
                 for method in self._transfer_methods:
                     if field in self._transfer_methods[method]:
-                        if getattr(self, method, False):
-                            call_values.append(getattr(self, method)(hash))
+                        if hasattr(method, '__call__'):
+                            call_values.append(method(self, hash))
                         else:
                             calls.append({'methodName': method, 'params': [hash]})
                         break
@@ -169,7 +169,7 @@ class Client(rTorrent, Client):
             for field in transfer._fields:
                 for method in self._transfer_methods:
                     if field in self._transfer_methods[method]:
-                        setattr(transfer, field, call_values.pop(0) if getattr(self, method, False) else  multicall_values.pop(0))
+                        setattr(transfer, field, call_values.pop(0) if hasattr(method, '__call__') else  multicall_values.pop(0))
                         break
             transfers.append(transfer)
 
@@ -188,8 +188,8 @@ class Client(rTorrent, Client):
                 for field in self.server.File._fields:
                     for method in self._file_methods:
                         if field in self._file_methods[method]:
-                            if getattr(self, method, False):
-                                call_values.append(getattr(self, method)(hash, i))
+                            if hasattr(method, '__call__'):
+                                call_values.append(method(self, hash, i))
                             else:
                                 calls.append({'methodName': method, 'params': [hash, i]})
                             break
@@ -204,7 +204,7 @@ class Client(rTorrent, Client):
                 for field in file._fields:
                     for method in self._file_methods:
                         if field in self._file_methods[method]:
-                            setattr(file, field, call_values.pop(0) if getattr(self, method, False) else  multicall_values.pop(0))
+                            setattr(file, field, call_values.pop(0) if hasattr(method, '__call__') else  multicall_values.pop(0))
                             break
                 files[hash].append(file)
 
@@ -220,8 +220,8 @@ class Client(rTorrent, Client):
             for field in self.server.Properties._fields:
                 for method in self._property_methods:
                     if field in self._property_methods[method]:
-                        if getattr(self, method, False):
-                            call_values.append(getattr(self, method)(hash))
+                        if hasattr(method, '__call__'):
+                            call_values.append(method(self, hash))
                         else:
                             calls.append({'methodName': method, 'params': [hash]})
                         break
@@ -236,10 +236,7 @@ class Client(rTorrent, Client):
             for field in property._fields:
                 for method in self._property_methods:
                     if field in self._property_methods[method]:
-                        if getattr(self, method, False):
-                            setattr(property, field, call_values.pop(0))
-                        else:
-                            setattr(property, field, multicall_values.pop(0))
+                        setattr(property, field, call_values.pop(0) if hasattr(method, '__call__') else multicall_values.pop(0))
                         break
             properties[hash] = property
 
