@@ -2,11 +2,13 @@ class Action(object):
 
     @classmethod
     def required(self, method):
+        method.action = True
         method.action_required = True
         return method
 
     @classmethod
     def optional(self, method):
+        method.action = True
         method.action_required = False
         return method
 
