@@ -52,9 +52,10 @@ class Server(Interface):
         def args(self):
             self._args = getattr(self, '_args', {})
 
-            if not self._args:
+            path = self.path.split('?')
+            if len(path) > 1 and not self._args:
                 from cgi import parse_qs
-                for key, value in self._scrub_args(parse_qs(self.path.split('?')[1])).items():
+                for key, value in self._scrub_args(parse_qs(path[1])).items():
                     self._args[key] = value[0] if type(value) is list and len(value) is 1 else value
 
             return self._args
