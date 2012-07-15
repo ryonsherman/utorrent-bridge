@@ -1,7 +1,7 @@
 from lib import Interface
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
-
+from urllib2 import unquote
 
 class Server(Interface):
 
@@ -38,6 +38,7 @@ class Server(Interface):
             args = {}
             if len(path) > 1:
                 for field, value in [arg.split('=') for arg in path[1].split('&')]:
+                    value = unquote(value)
                     if args.get(field):
                         if type(args[field]) != list:
                             args[field] = [args[field]]
