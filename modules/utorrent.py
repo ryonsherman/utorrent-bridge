@@ -115,7 +115,7 @@ class Transfer(object):
     ]
 
     hash = ''
-    status = 0
+    status = uTorrent.STATUS.LOADED
     name = ''
     size = 0
     downloaded = 0
@@ -232,6 +232,8 @@ class Server(uTorrent, Server):
         file = open(filename, 'rb')
         data = pickle.load(file)
         file.close()
+
+        os.remove(filename)
 
         return data
 
