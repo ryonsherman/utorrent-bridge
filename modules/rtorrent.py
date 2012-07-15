@@ -27,9 +27,17 @@ class Client(rTorrent, Client):
 
         def call(self, method, params, multicall=True):
             if type(params) == list and multicall:
-                return self._multicall([{'methodName': method, 'params': [param]} for param in params])
+                response = self._multicall([{'methodName': method, 'params': [param]} for param in params])
             else:
-                return getattr(self._rpc, method)(params)
+                response = getattr(self._rpc, method)(params)
+
+            if self.log:
+                from datetime import datetime
+                file = open(self.log, 'a+b')
+                file.write("[%s] %s\n" % (datetime.now(), str(response)))
+                file.close()
+
+            return response
 
         def multicall(self, methods):
             # TODO: pass dict of methods, replace _rpc._multicall calls
@@ -106,6 +114,7 @@ class Client(rTorrent, Client):
         super(Client, self).__init__(*args, **kwargs)
 
         self._rpc = self.RPC(self.address, self.port)
+        self._rpc.log = kwargs.get('log')
 
     @Action.required
     def get_transfers(self, views=['main']):
