@@ -171,10 +171,10 @@ class Properties(object):
     trackers = ''
     ulrate = 0
     dlrate = 0
-    superseed = uTorrent.BOOLEAN.DISABLED
-    dht = uTorrent.BOOLEAN.DISABLED
-    pex = uTorrent.BOOLEAN.DISABLED
-    seed_override = uTorrent.BOOLEAN.DISABLED
+    superseed = 0
+    dht = 0
+    pex = 0
+    seed_override = 0
     seed_ratio = 0
     seed_time = 0
     ulslots = 0
