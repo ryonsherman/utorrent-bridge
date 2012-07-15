@@ -7,7 +7,7 @@ class uTorrentBridge:
         # If module_1 property is an action
         if hasattr(getattr(module_1, property), 'action_required'):
             # If module_1 action is optional
-            if getattr(getattr(module_1, property), 'action_required', False) == False:
+            if not getattr(getattr(module_1, property), 'action_required', False):
                 return True
             # If module_2 does not have action
             elif not hasattr(module_2, property):
@@ -40,6 +40,10 @@ class uTorrentBridge:
         self.server._stop()
 
 if __name__ == '__main__':
+    from optparse import OptionParser
+    parser = OptionParser()
+    (options, args) = parser.parse_args()
+
     from ConfigParser import SafeConfigParser
     config = SafeConfigParser()
     config.read('config.conf')
