@@ -27,15 +27,14 @@ class Client(rTorrent, Client):
 
         def call(self, method, params, multicall=True):
             if type(params) == list and multicall:
-                return self.multicall(method, params)
+                return self._multicall([{'methodName': method, 'params': [param]} for param in params])
             else:
                 return getattr(self._rpc, method)(params)
 
-        def multicall(self, method, params):
-            calls = []
-            for param in params:
-                calls.append({'methodName': method, 'params': [param]})
-            return self._multicall(calls)
+        def multicall(self, methods):
+            # TODO: pass dict of methods, replace _rpc._multicall calls
+            for method, params in methods.iteritems():
+                pass
 
     _transfer_methods = {
         'd.get_state': ['status'],
