@@ -1,6 +1,5 @@
 from lib import Interface
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-from urllib2 import unquote
 
 
 class Server(Interface):
@@ -31,37 +30,73 @@ class Server(Interface):
 
             return False
 
-        def do_GET(self):
-            path = self.path.split('?')
-            route = self._routes.get(path[0], self._routes['/'])
+        def _scrub_args(self, args):
+            from urllib2 import unquote
 
-            args = {}
-            if len(path) > 1:
-                for field, value in [arg.split('=') for arg in path[1].split('&')]:
-                    value = unquote(value)
-                    if args.get(field):
-                        if type(args[field]) != list:
-                            args[field] = [args[field]]
-                        args[field].append(value)
-                    else:
-                        args[field] = value
+            for key, value in args.items():
+                if type(value) is list:
+                    scrubbed_args = []
+                    for value in value:
+                        scrubbed_args.append(unquote(value))
+                    args[key] = scrubbed_args
+                else:
+                    args[key] = unquote(value)
 
-            if route['auth']:
+            return args
+
+        @property
+        def route(self):
+            return self._routes.get(self.path.split('?')[0], self._routes['/'])
+
+        @property
+        def args(self):
+            self._args = getattr(self, '_args', {})
+
+            if not self._args:
+                from cgi import parse_qs
+                for key, value in self._scrub_args(parse_qs(self.path.split('?')[1])).items():
+                    self._args[key] = value[0] if type(value) is list and len(value) is 1 else value
+
+            return self._args
+
+        @args.setter
+        def args(self, args):
+            self._args = args
+
+        def authorize(self):
+            if self.route['auth']:
                 method = '_auth_%s' % self.auth
                 if hasattr(self, method):
                     auth = getattr(self, method)
                     if auth and not auth():
-                        return self._response_auth()
+                        self._response_auth()
+                        return False
+            return True
 
-            self._response_default(route['callback'](**args))
+        def do_GET(self):
+            if not self.authorize():
+                return
+
+            self._response_default(self.route['callback'](**self.args))
+
+        def do_POST(self):
+            if not self.authorize():
+                return
+
+            from cgi import parse_header, parse_multipart
+
+            content_type, params = parse_header(self.headers.getheader('content-type'))
+            if content_type == 'multipart/form-data':
+                for key, value in parse_multipart(self.rfile, params).items():
+                    self.args[key] = value[0] if type(value) is list and len(value) is 1 else value
+
+            self._response_default(self.route['callback'](**self.args))
 
         def log_message(self, format, *args):
             message = "%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(), format % args)
 
             if self.log:
-                file = open(self.log, 'a+b')
-                file.write(message)
-                file.close()
+                open(self.log, 'a+b').write(message)
 
             # TODO: Provide '-q, --quiet' option
             # import sys
