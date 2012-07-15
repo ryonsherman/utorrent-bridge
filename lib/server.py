@@ -63,8 +63,9 @@ class Server(Interface):
                 file.write(message)
                 file.close()
 
-            import sys
-            sys.stderr.write(message)
+            # TODO: Provide '-q, --quiet' option
+            # import sys
+            # sys.stderr.write(message)
 
     def __init__(self, *args, **kwargs):
         self.address = kwargs['address']
